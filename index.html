@@ -1,0 +1,1915 @@
+
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>María Vitae | Tranquilidad para quienes más amas</title>
+    
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons (Iconos premium) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        premium: { white: '#FAFAFA', beige: '#FDFBF7', gold: '#D4AF37' },
+                        medical: { blue: '#1E3A8A', light: '#3B82F6' },
+                        sage: { light: '#E8F5E9', DEFAULT: '#81C784', dark: '#4CAF50' }
+                    },
+                    boxShadow: {
+                        'soft': '0 10px 40px -10px rgba(0,0,0,0.05)',
+                        'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Supabase JS (Base de datos y Auth) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Alpine.js (Interactividad) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <style>
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Inter', sans-serif; background-color: #FDFBF7; }
+        [x-cloak] { display: none !important; }
+        /* Scrollbar invisible para los mockups móviles */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body x-data="mariaVitaeApp()" class="text-slate-800 antialiased selection:bg-medical-light selection:text-white">
+
+    <!-- ==========================================
+         BARRA DE SUPERVISIÓN ADMIN
+         ========================================== -->
+    <div x-show="userRole === 'admin'" class="bg-slate-900 text-white p-3 text-sm flex flex-wrap justify-center gap-2 md:gap-4 shadow-md relative z-50 sticky top-0" x-cloak>
+        <span class="opacity-50 mr-2 hidden md:inline flex items-center"><i class="ph-fill ph-shield-check mr-1"></i> Modo Supervisión (Admin):</span>
+        <button @click="view = 'admin'" :class="view === 'admin' ? 'bg-medical-light' : 'bg-slate-700'" class="px-4 py-1.5 rounded-full transition font-medium">CRM Admin</button>
+        <button @click="view = 'family'" :class="view === 'family' ? 'bg-medical-light' : 'bg-slate-700'" class="px-4 py-1.5 rounded-full transition font-medium">Portal Familiar</button>
+        <button @click="view = 'caregiver'" :class="view === 'caregiver' ? 'bg-medical-light' : 'bg-slate-700'" class="px-4 py-1.5 rounded-full transition font-medium">App Cuidadora</button>
+    </div>
+
+    <!-- ==========================================
+         MODALES GLOBALES DE AUTENTICACIÓN
+         ========================================== -->
+    
+    <!-- Modal Login Global -->
+    <div x-show="showLoginModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" x-cloak>
+        <div class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md" @click.away="showLoginModal = false">
+            <div class="flex items-center gap-2 mb-6 justify-center">
+                <i class="ph-fill ph-heart text-premium-gold text-3xl"></i>
+                <h2 class="text-2xl font-bold text-medical-blue">Iniciar Sesión</h2>
+            </div>
+            <p class="text-center text-sm text-slate-500 mb-6">Accede a tu portal correspondiente.</p>
+            <form @submit.prevent="login" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Correo Electrónico</label>
+                    <input type="email" x-model="loginEmail" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
+                    <input type="password" x-model="loginPassword" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                </div>
+                <p x-show="loginError" x-text="loginError" class="text-red-500 text-xs font-medium text-center"></p>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" @click="showLoginModal = false" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition" :disabled="loginLoading">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-medical-blue text-white py-3 rounded-xl font-semibold shadow-soft hover:bg-blue-900 transition flex justify-center items-center gap-2" :disabled="loginLoading">
+                        <span x-show="!loginLoading">Ingresar</span>
+                        <span x-show="loginLoading" class="animate-pulse">Verificando...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Registro Global -->
+    <div x-show="showRegisterModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" x-cloak>
+        <div class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md" @click.away="showRegisterModal = false">
+            <div class="flex items-center gap-2 mb-6 justify-center">
+                <i class="ph-fill ph-user-plus text-premium-gold text-3xl"></i>
+                <h2 class="text-2xl font-bold text-medical-blue">Crear Cuenta</h2>
+            </div>
+            <form @submit.prevent="registerUser" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nombre Completo</label>
+                    <input type="text" x-model="registerData.nombre" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Correo Electrónico</label>
+                    <input type="email" x-model="registerData.email" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
+                        <input type="password" x-model="registerData.password" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required minlength="6">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Confirmar</label>
+                        <input type="password" x-model="registerData.confirmPassword" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required minlength="6">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Tipo de Usuario</label>
+                    <select x-model="registerData.role" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                        <option value="family">Familiar (Busco cuidados)</option>
+                        <option value="caregiver">Cuidadora (Ofrezco servicios)</option>
+                    </select>
+                </div>
+                <p x-show="registerError" x-text="registerError" class="text-red-500 text-xs font-medium text-center"></p>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" @click="showRegisterModal = false" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition" :disabled="registerLoading">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-medical-blue text-white py-3 rounded-xl font-semibold shadow-soft hover:bg-blue-900 transition flex justify-center items-center gap-2" :disabled="registerLoading">
+                        <span x-show="!registerLoading">Registrarse</span>
+                        <span x-show="registerLoading" class="animate-pulse">Creando...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         VISTA 1: LANDING PAGE PREMIUM
+         ========================================== -->
+    <div x-show="view === 'landing'" x-transition.opacity.duration.500ms x-cloak class="min-h-screen bg-premium-beige">
+        <!-- Navbar -->
+        <nav class="w-full px-6 py-6 flex justify-between items-center max-w-7xl mx-auto">
+            <div class="text-2xl font-bold text-medical-blue flex items-center gap-2">
+                <i class="ph-fill ph-heart text-premium-gold text-3xl"></i> María Vitae
+            </div>
+            <div class="hidden md:flex items-center space-x-8">
+                <a href="#servicios" class="text-slate-600 hover:text-medical-blue transition font-medium">Servicios</a>
+                <a href="#nosotros" class="text-slate-600 hover:text-medical-blue transition font-medium">Nosotros</a>
+                
+                <!-- Botones de Autenticación Reales -->
+                <button x-show="!isAuthenticated" @click="showLoginModal = true" class="text-medical-blue font-semibold hover:text-medical-light transition">Iniciar Sesión</button>
+                <button x-show="!isAuthenticated" @click="showRegisterModal = true" class="bg-medical-blue text-white px-6 py-2.5 rounded-full shadow-soft hover:bg-blue-900 transition font-medium">
+                    Registrarse
+                </button>
+                
+                <!-- Botón de retorno si ya está logueado -->
+                <button x-show="isAuthenticated" @click="view = userRole === 'admin' ? 'admin' : (userRole === 'caregiver' ? (caregiverStatus === 'pendiente' ? 'caregiver_pending' : (caregiverStatus === 'rechazado' || caregiverStatus === 'inactivo' ? 'caregiver_rejected' : 'caregiver')) : 'family')" class="bg-medical-blue text-white px-6 py-2.5 rounded-full shadow-soft hover:bg-blue-900 transition font-medium flex items-center gap-2">
+                    Ir a mi Portal <i class="ph ph-arrow-right"></i>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Hero Section -->
+        <main class="max-w-7xl mx-auto px-6 pt-16 pb-24 flex flex-col lg:flex-row items-center gap-16">
+            <div class="flex-1 space-y-8">
+                <div class="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-100">
+                    <span class="w-2 h-2 rounded-full bg-sage-dark animate-pulse"></span>
+                    <span class="text-sm font-medium text-slate-600">Atención gerontológica domiciliaria de alta calidad</span>
+                </div>
+                
+                <h1 class="text-5xl lg:text-7xl font-extrabold leading-[1.1] text-slate-900 tracking-tight">
+                    Tranquilidad para <br/>
+                    <span class="text-medical-blue">quienes más amas.</span>
+                </h1>
+                
+                <p class="text-xl text-slate-600 max-w-lg leading-relaxed font-light">
+                    Plataforma integral de gestión de cuidados gerontológicos. Atención profesional, humana y especializada para adultos mayores desde la comodidad del hogar. Monitoreo inteligente y reportes diarios para tu paz mental.
+                </p>
+                
+                <div class="flex flex-col sm:flex-row gap-4 pt-4">
+                    <button @click="showLeadModal = true" class="bg-medical-blue text-white px-8 py-4 rounded-full font-semibold shadow-soft hover:bg-blue-900 transition flex items-center justify-center gap-2">
+                        Agendar evaluación <i class="ph ph-arrow-right text-xl"></i>
+                    </button>
+                    <button @click="openWhatsApp('Hola, necesito más información sobre los servicios de María Vitae.')" class="bg-white text-slate-700 border border-slate-200 px-8 py-4 rounded-full font-semibold shadow-sm hover:bg-slate-50 transition flex items-center justify-center gap-2">
+                        <i class="ph ph-whatsapp-logo text-xl text-green-500"></i> Hablar por WhatsApp
+                    </button>
+                </div>
+            </div>
+
+            <!-- Hero Visual (Glassmorphism) -->
+            <div class="flex-1 w-full h-[500px] lg:h-[600px] relative rounded-[2.5rem] overflow-hidden shadow-2xl">
+                <div class="absolute inset-0 bg-cover bg-center" style="background-image: url('hero-gerontologia.jpg');"></div>
+                <div class="absolute inset-0 bg-gradient-to-t from-medical-blue/40 via-medical-blue/5 to-transparent"></div>
+                
+                <!-- Floating UI Card -->
+                <div class="absolute bottom-8 left-8 right-8 bg-white/95 backdrop-blur-xl p-6 rounded-3xl border border-white/50 shadow-glass transform hover:-translate-y-2 transition duration-500">
+                    <div class="flex items-center gap-4 mb-3 border-b border-slate-100 pb-3">
+                        <div class="bg-sage-light p-3 rounded-full text-sage-dark">
+                            <i class="ph-fill ph-hand-heart text-2xl"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold text-slate-800">Excelencia en Cuidado Gerontológico</p>
+                            <p class="text-xs text-sage-dark font-medium">Atención premium garantizada</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-600 leading-relaxed">
+                        Nuestro equipo de cuidadoras profesionales está comprometido en brindar un acompañamiento cálido, humano y constante, asegurando el bienestar integral y la dignidad de tu ser querido en todo momento.
+                    </p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Servicios Section -->
+        <section id="servicios" class="py-24 bg-white">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-4xl font-bold text-medical-blue mb-4">Nuestros Servicios</h2>
+                    <p class="text-slate-600 max-w-2xl mx-auto">Atención personalizada y profesional adaptada a las necesidades de tu ser querido.</p>
+                </div>
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div class="bg-slate-50 p-8 rounded-3xl border border-slate-100 hover:shadow-soft transition">
+                        <div class="w-14 h-14 bg-medical-light/10 text-medical-blue rounded-2xl flex items-center justify-center mb-6">
+                            <i class="ph-fill ph-heartbeat text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-3">Enfermería y Gerontología</h3>
+                        <p class="text-slate-600 text-sm leading-relaxed">Administración de medicamentos, control de signos vitales y curaciones por profesionales capacitados.</p>
+                    </div>
+                    <div class="bg-slate-50 p-8 rounded-3xl border border-slate-100 hover:shadow-soft transition">
+                        <div class="w-14 h-14 bg-sage-light text-sage-dark rounded-2xl flex items-center justify-center mb-6">
+                            <i class="ph-fill ph-users text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-3">Acompañamiento Profesional</h3>
+                        <p class="text-slate-600 text-sm leading-relaxed">Asistencia en actividades diarias, paseos, estimulación cognitiva y compañía empática.</p>
+                    </div>
+                    <div class="bg-slate-50 p-8 rounded-3xl border border-slate-100 hover:shadow-soft transition">
+                        <div class="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mb-6">
+                            <i class="ph-fill ph-clock text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-3">Supervisión y Bitácora Digital</h3>
+                        <p class="text-slate-600 text-sm leading-relaxed">Supervisión continua con reportes diarios a través de nuestra plataforma digital para tu tranquilidad.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Nosotros Section -->
+        <section id="nosotros" class="py-24 bg-premium-beige">
+            <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center gap-16">
+                <div class="flex-1">
+                    <div class="relative rounded-[2.5rem] overflow-hidden shadow-2xl h-[400px]">
+                        <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?q=80&w=1000&auto=format&fit=crop')] bg-cover bg-center"></div>
+                    </div>
+                </div>
+                <div class="flex-1 space-y-6">
+                    <h2 class="text-3xl md:text-4xl font-bold text-medical-blue">Sobre María Vitae</h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        Nacimos con la convicción de que nuestros adultos mayores merecen la mejor calidad de vida en la comodidad de su hogar. 
+                        Combinamos la calidez humana con tecnología de vanguardia para ofrecer un servicio transparente, seguro y confiable.
+                    </p>
+                    <p class="text-slate-600 leading-relaxed">
+                        Nuestro equipo está formado por cuidadoras y profesionales de la salud rigurosamente seleccionados, comprometidos con el bienestar físico, cognitivo y emocional de cada paciente.
+                    </p>
+                    <div class="pt-4">
+                        <button @click="showLeadModal = true" class="bg-medical-blue text-white px-8 py-3 rounded-full font-semibold shadow-soft hover:bg-blue-900 transition">
+                            Conoce más
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Modal Lead (Registro Público) -->
+        <div x-show="showLeadModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" x-cloak>
+            <div class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md" @click.away="showLeadModal = false">
+                <h2 class="text-xl font-bold text-slate-900 mb-6">Agendar Evaluación</h2>
+                <form @submit.prevent="registerLead" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Nombre del Familiar</label>
+                        <input type="text" x-model="newLead.nombre" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Teléfono de Contacto</label>
+                        <input type="tel" x-model="newLead.telefono" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Servicio de Interés</label>
+                        <input type="text" x-model="newLead.servicio" placeholder="Ej: Cuidados 8h" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" @click="showLeadModal = false" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition">Cancelar</button>
+                        <button type="submit" class="flex-1 bg-medical-blue text-white py-3 rounded-xl font-semibold shadow-soft hover:bg-blue-900 transition flex justify-center items-center gap-2">
+                            <span x-show="!savingLead">Solicitar</span>
+                            <span x-show="savingLead" class="animate-pulse">Enviando...</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         VISTA 2: CRM ADMINISTRATIVO (SaaS)
+         ========================================== -->
+    <div x-show="view === 'admin'" x-transition.opacity.duration.500ms class="flex h-screen bg-premium-white" x-cloak>
+        
+        <!-- MODAL DE LOGIN ORIGINAL (Mantenido por compatibilidad) -->
+        <div x-show="!isAuthenticated" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+            <div class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md">
+                <div class="flex items-center gap-2 mb-6 justify-center">
+                    <i class="ph-fill ph-heart text-premium-gold text-3xl"></i>
+                    <h2 class="text-2xl font-bold text-medical-blue">Acceso CRM</h2>
+                </div>
+                <p class="text-center text-sm text-slate-500 mb-6">Ingresa tus credenciales de administrador.</p>
+                <form @submit.prevent="login" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Correo Electrónico</label>
+                        <input type="email" x-model="loginEmail" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
+                        <input type="password" x-model="loginPassword" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <p x-show="loginError" x-text="loginError" class="text-red-500 text-xs font-medium text-center"></p>
+                    <button type="submit" class="w-full bg-medical-blue text-white py-3 rounded-xl font-semibold shadow-soft hover:bg-blue-900 transition flex justify-center items-center gap-2" :disabled="loginLoading">
+                        <span x-show="!loginLoading">Ingresar al Sistema</span>
+                        <span x-show="loginLoading" class="animate-pulse">Verificando...</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <aside x-show="isAuthenticated" class="w-64 bg-white border-r border-slate-100 flex flex-col hidden md:flex">
+            <div class="p-6 border-b border-slate-50 flex items-center gap-2">
+                <i class="ph-fill ph-heart text-premium-gold text-2xl"></i>
+                <h2 class="text-xl font-bold text-medical-blue">María Vitae</h2>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <a href="#" @click.prevent="adminTab = 'pacientes'; fetchPacientes()" :class="adminTab === 'pacientes' ? 'bg-medical-light/10 text-medical-blue' : 'text-slate-500 hover:bg-slate-50 hover:text-medical-blue'" class="flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold transition">
+                    <i class="ph ph-users text-xl"></i> Pacientes
+                </a>
+                <a href="#" @click.prevent="adminTab = 'cuidadores'; fetchCuidadores()" :class="adminTab === 'cuidadores' ? 'bg-medical-light/10 text-medical-blue' : 'text-slate-500 hover:bg-slate-50 hover:text-medical-blue'" class="flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold transition">
+                    <i class="ph ph-user-nurse text-xl"></i> Cuidadoras
+                </a>
+                <a href="#" @click.prevent="adminTab = 'usuarios'; fetchUsuarios()" :class="adminTab === 'usuarios' ? 'bg-medical-light/10 text-medical-blue' : 'text-slate-500 hover:bg-slate-50 hover:text-medical-blue'" class="flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold transition">
+                    <i class="ph ph-users-three text-xl"></i> Usuarios
+                </a>
+                <a href="#" @click.prevent="adminTab = 'agenda'; fetchVisitas()" :class="adminTab === 'agenda' ? 'bg-medical-light/10 text-medical-blue' : 'text-slate-500 hover:bg-slate-50 hover:text-medical-blue'" class="flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold transition">
+                    <i class="ph ph-calendar-blank text-xl"></i> Agenda
+                </a>
+                <a href="#" @click.prevent="adminTab = 'pagos'; fetchPagos()" :class="adminTab === 'pagos' ? 'bg-medical-light/10 text-medical-blue' : 'text-slate-500 hover:bg-slate-50 hover:text-medical-blue'" class="flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold transition">
+                    <i class="ph ph-credit-card text-xl"></i> Pagos
+                </a>
+            </nav>
+            <div class="p-4 border-t border-slate-50">
+                <button @click="logout" class="flex items-center gap-3 px-4 py-3 w-full text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-2xl font-medium transition">
+                    <i class="ph ph-sign-out text-xl"></i> Cerrar Sesión
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main x-show="isAuthenticated" class="flex-1 overflow-y-auto p-8 bg-slate-50/50">
+            <div class="flex justify-between items-center mb-10">
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-900">Hola, Admin</h1>
+                    <p class="text-slate-500 mt-1">Centro Operativo de Gestión de Pacientes y Cuidadoras.</p>
+                </div>
+                <button x-show="adminTab === 'pacientes'" @click="showNewPatientModal = true" class="bg-medical-blue text-white px-5 py-2.5 rounded-xl shadow-sm hover:bg-blue-900 font-medium flex items-center gap-2">
+                    <i class="ph ph-plus font-bold"></i> Nuevo Paciente
+                </button>
+            </div>
+            
+            <!-- CONTENEDOR PACIENTES -->
+            <div x-show="adminTab === 'pacientes'">
+                <!-- KPIs Dinámicos -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+                    <div class="bg-white p-6 rounded-3xl shadow-soft border border-slate-100">
+                        <div class="w-12 h-12 rounded-2xl bg-medical-light/10 text-medical-blue flex items-center justify-center mb-4">
+                            <i class="ph-fill ph-users text-2xl"></i>
+                        </div>
+                        <h3 class="text-slate-500 text-sm font-medium">Pacientes Activos</h3>
+                        <p class="text-3xl font-bold text-slate-900 mt-1" x-text="pacientes.length"></p>
+                        <p class="text-sage-dark text-sm mt-2 font-medium flex items-center gap-1"><i class="ph ph-trend-up"></i> Actualizado</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl shadow-soft border border-slate-100">
+                        <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mb-4">
+                            <i class="ph-fill ph-car-profile text-2xl"></i>
+                        </div>
+                        <h3 class="text-slate-500 text-sm font-medium">Visitas en Curso</h3>
+                        <p class="text-3xl font-bold text-slate-900 mt-1" x-text="pacientes.filter(p => p.estado === 'En Curso').length"></p>
+                        <p class="text-amber-600 text-sm mt-2 font-medium flex items-center gap-1"><i class="ph ph-clock"></i> Tiempo real</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl shadow-soft border border-slate-100">
+                        <div class="w-12 h-12 rounded-2xl bg-sage-light text-sage-dark flex items-center justify-center mb-4">
+                            <i class="ph-fill ph-star text-2xl"></i>
+                        </div>
+                        <h3 class="text-slate-500 text-sm font-medium">Satisfacción</h3>
+                        <p class="text-3xl font-bold text-slate-900 mt-1">4.9/5</p>
+                        <p class="text-sage-dark text-sm mt-2 font-medium">Basado en 50 reviews</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl shadow-soft border border-slate-100">
+                        <div class="w-12 h-12 rounded-2xl bg-medical-light/10 text-medical-blue flex items-center justify-center mb-4">
+                            <i class="ph-fill ph-currency-dollar text-2xl"></i>
+                        </div>
+                        <h3 class="text-slate-500 text-sm font-medium">Ingresos (Mes)</h3>
+                        <p class="text-3xl font-bold text-slate-900 mt-1">$8,450</p>
+                        <p class="text-sage-dark text-sm mt-2 font-medium flex items-center gap-1"><i class="ph ph-trend-up"></i> +12% vs mes anterior</p>
+                    </div>
+                </div>
+
+                <!-- Active Visits Table Dinámica -->
+                <div class="bg-white rounded-3xl shadow-soft border border-slate-100 p-8">
+                    <h2 class="text-xl font-bold text-slate-900 mb-6">Monitoreo Operativo en Tiempo Real</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-slate-400 text-sm uppercase tracking-wider border-b border-slate-100">
+                                    <th class="pb-4 font-semibold">Paciente</th>
+                                    <th class="pb-4 font-semibold">Cuidadora</th>
+                                    <th class="pb-4 font-semibold">Servicio</th>
+                                    <th class="pb-4 font-semibold">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <template x-for="paciente in pacientes" :key="paciente.id">
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                                        <td class="py-5 font-medium text-slate-900 flex items-center gap-3">
+                                            <div class="w-10 h-10 rounded-full bg-medical-light/10 text-medical-blue flex items-center justify-center font-bold" x-text="(paciente?.nombre || 'NN').substring(0,2).toUpperCase()"></div>
+                                            <span x-text="paciente?.nombre || 'Desconocido'"></span>
+                                        </td>
+                                        <td class="py-5 text-slate-600" x-text="paciente?.cuidadora || 'No asignada'"></td>
+                                        <td class="py-5 text-slate-600" x-text="paciente?.servicio || 'No especificado'"></td>
+                                        <td class="py-5 flex items-center gap-3">
+                                            <span :class="paciente.estado === 'En Curso' ? 'bg-amber-100 text-amber-700' : (paciente.estado === 'Pagado/Activo' ? 'bg-medical-light/20 text-medical-blue' : (paciente.estado === 'Prospecto' || paciente.estado === 'Pendiente' ? 'bg-slate-100 text-slate-600' : 'bg-sage-light text-sage-dark'))" class="px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 w-max">
+                                                <span x-show="paciente.estado === 'En Curso'" class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                                                <i x-show="paciente.estado !== 'En Curso' && paciente.estado !== 'Prospecto' && paciente.estado !== 'Pendiente'" class="ph-fill ph-check-circle text-sm"></i>
+                                                <i x-show="paciente.estado === 'Prospecto' || paciente.estado === 'Pendiente'" class="ph-fill ph-clock text-sm"></i>
+                                                <span x-text="paciente.estado"></span>
+                                            </span>
+                                            <!-- Botón de Geolocalización -->
+                                            <a x-show="paciente.lat && paciente.lng" :href="'https://maps.google.com/?q=' + paciente.lat + ',' + paciente.lng" target="_blank" class="text-medical-light hover:text-medical-blue transition ml-2 bg-medical-light/10 p-1.5 rounded-full" title="Ver Ubicación en Mapa">
+                                                <i class="ph-fill ph-map-pin text-lg"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="pacientes.length === 0">
+                                    <td colspan="4" class="py-8 text-center text-slate-500">No hay pacientes registrados.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Actividad Reciente -->
+                <div class="bg-white rounded-3xl shadow-soft border border-slate-100 p-8 mt-8">
+                    <h2 class="text-xl font-bold text-slate-900 mb-6">Registro de Actividad y Novedades</h2>
+                    <div class="space-y-4">
+                        <template x-for="actividad in getActividadReciente()" :key="actividad.id + actividad.tipo">
+                            <div class="flex items-start gap-4 p-4 rounded-2xl hover:bg-slate-50 transition border border-transparent hover:border-slate-100">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0" 
+                                     :class="actividad.tipo === 'informe' ? 'bg-medical-light/10 text-medical-blue' : (actividad.tipo === 'pago' ? 'bg-sage-light text-sage-dark' : 'bg-amber-100 text-amber-600')">
+                                    <i class="ph-fill text-xl" :class="actividad.tipo === 'informe' ? 'ph-file-text' : (actividad.tipo === 'pago' ? 'ph-currency-dollar' : 'ph-calendar-check')"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-bold text-slate-800" x-text="actividad.titulo"></p>
+                                    <p class="text-xs text-slate-500 mt-1" x-text="actividad.descripcion"></p>
+                                    <p class="text-[10px] text-slate-400 mt-2 font-medium uppercase tracking-wider" x-text="formatDate(actividad.fecha)"></p>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="getActividadReciente().length === 0" class="text-center py-8 text-slate-500 text-sm">
+                            No hay actividad reciente registrada.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTENEDOR CUIDADORAS -->
+            <div x-show="adminTab === 'cuidadores'" x-cloak>
+                <div class="bg-white rounded-3xl shadow-soft border border-slate-100 p-8">
+                    <h2 class="text-xl font-bold text-slate-900 mb-6">Gestión de Cuidadoras</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-slate-400 text-sm uppercase tracking-wider border-b border-slate-100">
+                                    <th class="pb-4 font-semibold">Nombre</th>
+                                    <th class="pb-4 font-semibold">Email</th>
+                                    <th class="pb-4 font-semibold">Estado</th>
+                                    <th class="pb-4 font-semibold">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <template x-for="cuidadora in cuidadores" :key="cuidadora.id">
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                                        <td class="py-5 font-medium text-slate-900" x-text="cuidadora.nombre"></td>
+                                        <td class="py-5 text-slate-600" x-text="cuidadora.email"></td>
+                                        <td class="py-5">
+                                            <span class="px-3 py-1.5 rounded-full text-xs font-bold"
+                                                  :class="{
+                                                      'bg-amber-100 text-amber-700': cuidadora.estado === 'pendiente',
+                                                      'bg-sage-light text-sage-dark': cuidadora.estado === 'aprobado',
+                                                      'bg-red-100 text-red-700': cuidadora.estado === 'rechazado' || cuidadora.estado === 'inactivo'
+                                                  }" x-text="cuidadora.estado.toUpperCase()"></span>
+                                        </td>
+                                        <td class="py-5 flex gap-2">
+                                            <button x-show="cuidadora.estado !== 'aprobado'" @click="updateCuidadoraStatus(cuidadora.id, 'aprobado')" class="bg-sage-light text-sage-dark px-3 py-1 rounded-lg text-xs font-bold hover:bg-sage-dark hover:text-white transition">Aprobar</button>
+                                            <button x-show="cuidadora.estado !== 'rechazado' && cuidadora.estado === 'pendiente'" @click="updateCuidadoraStatus(cuidadora.id, 'rechazado')" class="bg-red-100 text-red-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition">Rechazar</button>
+                                            <button x-show="cuidadora.estado === 'aprobado'" @click="updateCuidadoraStatus(cuidadora.id, 'inactivo')" class="bg-slate-100 text-slate-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-slate-200 transition">Desactivar</button>
+                                            <button @click="deleteUsuario(cuidadora.id, 'caregiver', cuidadora.email)" class="bg-red-50 text-red-500 px-3 py-1 rounded-lg text-xs font-bold hover:bg-red-100 transition" title="Eliminar Usuario"><i class="ph ph-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="cuidadores.length === 0">
+                                    <td colspan="4" class="py-8 text-center text-slate-500">No hay cuidadoras registradas.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTENEDOR USUARIOS -->
+            <div x-show="adminTab === 'usuarios'" x-cloak>
+                <div class="bg-white rounded-3xl shadow-soft border border-slate-100 p-8">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <h2 class="text-xl font-bold text-slate-900">Administración de Usuarios</h2>
+                        
+                        <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                            <!-- Buscador -->
+                            <div class="relative">
+                                <i class="ph ph-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                                <input type="text" x-model="searchUsuario" placeholder="Buscar por nombre o email..." class="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-medical-light w-full sm:w-64">
+                            </div>
+                            
+                            <!-- Filtros -->
+                            <select x-model="filterUsuario" class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light outline-none appearance-none pr-8 relative">
+                                <option value="todos">Todos los usuarios</option>
+                                <option value="familiares">Familiares</option>
+                                <option value="cuidadoras">Cuidadoras (Todas)</option>
+                                <option value="pendientes">Cuidadoras Pendientes</option>
+                                <option value="aprobadas">Cuidadoras Aprobadas</option>
+                                <option value="rechazadas">Cuidadoras Rechazadas</option>
+                                <option value="inactivas">Cuidadoras Inactivas</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-slate-400 text-sm uppercase tracking-wider border-b border-slate-100">
+                                    <th class="pb-4 font-semibold">Usuario</th>
+                                    <th class="pb-4 font-semibold">Contacto</th>
+                                    <th class="pb-4 font-semibold">Tipo</th>
+                                    <th class="pb-4 font-semibold">Estado</th>
+                                    <th class="pb-4 font-semibold">Registro</th>
+                                    <th class="pb-4 font-semibold">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <template x-for="usuario in filteredUsuarios" :key="usuario.id">
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                                        <td class="py-5 font-medium text-slate-900 flex items-center gap-3">
+                                            <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold"
+                                                 :class="usuario.rol === 'admin' ? 'bg-slate-800 text-white' : (usuario.rol === 'caregiver' ? 'bg-sage-light text-sage-dark' : 'bg-medical-light/10 text-medical-blue')"
+                                                 x-text="(usuario.nombre || 'NN').substring(0,2).toUpperCase()"></div>
+                                            <span x-text="usuario.nombre || 'Desconocido'"></span>
+                                        </td>
+                                        <td class="py-5 text-slate-600" x-text="usuario.email"></td>
+                                        <td class="py-5">
+                                            <span class="px-3 py-1.5 rounded-full text-xs font-bold"
+                                                  :class="usuario.rol === 'admin' ? 'bg-slate-100 text-slate-700' : (usuario.rol === 'caregiver' ? 'bg-sage-light/50 text-sage-dark' : 'bg-medical-light/10 text-medical-blue')"
+                                                  x-text="usuario.rol === 'family' ? 'Familiar' : (usuario.rol === 'caregiver' ? 'Cuidadora' : 'Admin')"></span>
+                                        </td>
+                                        <td class="py-5">
+                                            <span x-show="usuario.rol === 'caregiver'" class="px-3 py-1.5 rounded-full text-xs font-bold"
+                                                  :class="{
+                                                      'bg-amber-100 text-amber-700': usuario.estado === 'pendiente',
+                                                      'bg-sage-light text-sage-dark': usuario.estado === 'aprobado',
+                                                      'bg-red-100 text-red-700': usuario.estado === 'rechazado' || usuario.estado === 'inactivo'
+                                                  }" x-text="(usuario.estado || 'pendiente').toUpperCase()"></span>
+                                            <span x-show="usuario.rol === 'family'" class="px-3 py-1.5 rounded-full text-xs font-bold"
+                                                  :class="usuario.estado === 'Inactivo' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'"
+                                                  x-text="(usuario.estado || 'ACTIVO').toUpperCase()"></span>
+                                        </td>
+                                        <td class="py-5 text-slate-500 text-xs" x-text="formatDate(usuario.created_at)"></td>
+                                        <td class="py-5 flex gap-2 flex-wrap max-w-[250px]">
+                                            <!-- Ver -->
+                                            <button @click="verUsuario(usuario)" class="bg-medical-light/10 text-medical-blue px-2 py-1 rounded-lg text-xs font-bold hover:bg-medical-light/20 transition" title="Ver Detalles">Ver</button>
+                                            
+                                            <!-- Acciones Cuidadora Pendiente -->
+                                            <template x-if="usuario.rol === 'caregiver' && usuario.estado === 'pendiente'">
+                                                <div class="flex gap-1">
+                                                    <button @click="updateCuidadoraStatus(usuario.id, 'aprobado')" class="bg-sage-light text-sage-dark px-2 py-1 rounded-lg text-xs font-bold hover:bg-sage-dark hover:text-white transition">Aprobar</button>
+                                                    <button @click="updateCuidadoraStatus(usuario.id, 'rechazado')" class="bg-red-100 text-red-700 px-2 py-1 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition">Rechazar</button>
+                                                </div>
+                                            </template>
+
+                                            <!-- Desactivar -->
+                                            <button x-show="(usuario.rol === 'caregiver' && usuario.estado === 'aprobado') || (usuario.rol === 'family' && usuario.estado !== 'Inactivo')" 
+                                                    @click="desactivarUsuario(usuario)" 
+                                                    class="bg-slate-100 text-slate-700 px-2 py-1 rounded-lg text-xs font-bold hover:bg-slate-200 transition" title="Desactivar">Desactivar</button>
+                                            
+                                            <!-- Reactivar -->
+                                            <button x-show="(usuario.rol === 'caregiver' && (usuario.estado === 'inactivo' || usuario.estado === 'rechazado')) || (usuario.rol === 'family' && usuario.estado === 'Inactivo')" 
+                                                    @click="reactivarUsuario(usuario)" 
+                                                    class="bg-amber-100 text-amber-700 px-2 py-1 rounded-lg text-xs font-bold hover:bg-amber-200 transition" title="Reactivar">Reactivar</button>
+                                            
+                                            <!-- Eliminar -->
+                                            <button x-show="usuario.email !== DUEÑO_EMAIL" 
+                                                    @click="deleteUsuario(usuario.id, usuario.rol, usuario.email)" 
+                                                    class="bg-red-50 text-red-500 px-2 py-1 rounded-lg text-xs font-bold hover:bg-red-100 transition" title="Eliminar Usuario">Eliminar</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="filteredUsuarios.length === 0">
+                                    <td colspan="6" class="py-8 text-center text-slate-500">No se encontraron usuarios con los filtros actuales.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTENEDOR AGENDA -->
+            <div x-show="adminTab === 'agenda'" x-cloak>
+                <div class="bg-white rounded-3xl shadow-soft border border-slate-100 p-8">
+                    <h2 class="text-xl font-bold text-slate-900 mb-6">Agenda de Visitas</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-slate-400 text-sm uppercase tracking-wider border-b border-slate-100">
+                                    <th class="pb-4 font-semibold">Fecha</th>
+                                    <th class="pb-4 font-semibold">Horario</th>
+                                    <th class="pb-4 font-semibold">Estado</th>
+                                    <th class="pb-4 font-semibold">Notas</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <template x-for="visita in visitas" :key="visita.id">
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                                        <td class="py-5 font-medium text-slate-900" x-text="visita?.fecha || 'N/A'"></td>
+                                        <td class="py-5 text-slate-600" x-text="(visita?.hora_inicio || '') + ' - ' + (visita?.hora_fin || '')"></td>
+                                        <td class="py-5">
+                                            <span class="px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600" x-text="visita?.estado || 'Pendiente'"></span>
+                                        </td>
+                                        <td class="py-5 text-slate-600" x-text="visita?.notas || '-'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="visitas.length === 0">
+                                    <td colspan="4" class="py-8 text-center text-slate-500">No hay visitas registradas.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTENEDOR PAGOS -->
+            <div x-show="adminTab === 'pagos'" x-cloak>
+                <div class="bg-white rounded-3xl shadow-soft border border-slate-100 p-8">
+                    <h2 class="text-xl font-bold text-slate-900 mb-6">Registro de Pagos</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-slate-400 text-sm uppercase tracking-wider border-b border-slate-100">
+                                    <th class="pb-4 font-semibold">ID Pago</th>
+                                    <th class="pb-4 font-semibold">Monto</th>
+                                    <th class="pb-4 font-semibold">Método</th>
+                                    <th class="pb-4 font-semibold">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <template x-for="pago in pagos" :key="pago.id">
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                                        <td class="py-5 font-medium text-slate-900" x-text="'#' + pago.id"></td>
+                                        <td class="py-5 text-slate-600 font-semibold" x-text="'$' + (pago?.monto || '0')"></td>
+                                        <td class="py-5 text-slate-600" x-text="pago?.metodo || 'N/A'"></td>
+                                        <td class="py-5">
+                                            <span class="px-3 py-1.5 rounded-full text-xs font-bold bg-sage-light text-sage-dark" x-text="pago?.estado || 'Completado'"></span>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="pagos.length === 0">
+                                    <td colspan="4" class="py-8 text-center text-slate-500">No hay pagos registrados.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Modal Nuevo Paciente -->
+        <div x-show="showNewPatientModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" x-cloak>
+            <div class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md" @click.away="showNewPatientModal = false">
+                <h2 class="text-xl font-bold text-slate-900 mb-6">Registrar Nuevo Paciente</h2>
+                <form @submit.prevent="addPaciente" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Nombre del Paciente</label>
+                        <input type="text" x-model="newPatient.nombre" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Cuidadora Asignada (Nombre)</label>
+                        <input type="text" x-model="newPatient.cuidadora" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Servicio</label>
+                        <input type="text" x-model="newPatient.servicio" placeholder="Ej: Acompañamiento 8h" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light" required>
+                    </div>
+                    <!-- Nuevos campos para vinculación de usuarios (Ignorados en JS para cumplir esquema) -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Email del Familiar (Usuario)</label>
+                        <input type="email" x-model="newPatient.familiar_email" placeholder="Para vinculular cuenta" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Email de la Cuidadora (Usuario)</label>
+                        <input type="email" x-model="newPatient.cuidadora_email" placeholder="Para vinculular cuenta" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light">
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" @click="showNewPatientModal = false" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition">Cancelar</button>
+                        <button type="submit" class="flex-1 bg-medical-blue text-white py-3 rounded-xl font-semibold shadow-soft hover:bg-blue-900 transition flex justify-center items-center gap-2">
+                            <span x-show="!savingPatient">Guardar</span>
+                            <span x-show="savingPatient" class="animate-pulse">Guardando...</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         VISTA 3: PORTAL FAMILIAR (Mobile First)
+         ========================================== -->
+    <div x-show="view === 'family'" x-transition.opacity.duration.500ms class="min-h-screen bg-slate-200 flex justify-center items-center p-4" x-cloak>
+        <!-- Simulador de Teléfono -->
+        <div class="w-full max-w-[400px] bg-premium-beige rounded-[3rem] shadow-2xl overflow-hidden border-[8px] border-slate-900 relative h-[800px] flex flex-col">
+            
+            <!-- Header App -->
+            <div class="bg-medical-blue text-white p-6 pt-12 rounded-b-[2.5rem] shadow-md relative z-10">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <p class="text-medical-light/80 text-sm font-medium">Hola, <span x-text="currentPatient?.nombre || 'Familiar'"></span></p>
+                        <h2 class="text-2xl font-bold">Portal Familiar</h2>
+                    </div>
+                    <div class="flex gap-2">
+                        <button @click="openWhatsApp('Hola, necesito soporte con el Portal Familiar.')" class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center backdrop-blur-sm hover:bg-white/20 transition">
+                            <i class="ph ph-headset text-xl"></i>
+                        </button>
+                        <button @click="logout" class="w-10 h-10 rounded-full bg-red-500/20 text-red-100 flex items-center justify-center backdrop-blur-sm hover:bg-red-500/40 transition" title="Cerrar Sesión">
+                            <i class="ph ph-sign-out text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Selector de Pacientes (Si hay múltiples) -->
+                <select x-show="pacientes.length > 1" x-model="currentPatientId" @change="loadPatientContext(currentPatientId)" class="mb-4 bg-white/20 text-white text-sm rounded-xl px-3 py-2 outline-none w-full appearance-none border border-white/10">
+                    <template x-for="p in pacientes" :key="p.id">
+                        <option :value="p.id" x-text="p.nombre" class="text-slate-900"></option>
+                    </template>
+                </select>
+                
+                <!-- Status Card -->
+                <div class="bg-white text-slate-800 p-4 rounded-2xl shadow-lg flex items-center gap-4">
+                    <div class="relative">
+                        <img src="https://i.pravatar.cc/100?img=5" class="w-14 h-14 rounded-full border-2 border-sage-dark object-cover">
+                        <div class="absolute bottom-0 right-0 w-4 h-4 bg-sage-dark border-2 border-white rounded-full"></div>
+                    </div>
+                    <div>
+                        <p class="text-[10px] text-sage-dark font-bold uppercase tracking-wider mb-0.5">En este momento</p>
+                        <p class="font-bold text-sm leading-tight"><span x-text="currentPatient?.cuidadora || 'La cuidadora'"></span> está con <span x-text="currentPatient?.nombre || 'tu familiar'"></span>.</p>
+                        <p class="text-xs text-slate-500 mt-1 flex items-center gap-1"><i class="ph ph-clock"></i> Llegó a las <span x-text="currentVisit?.hora_inicio || '08:00 AM'"></span></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Body App -->
+            <div class="flex-1 p-6 overflow-y-auto no-scrollbar space-y-6 pb-24">
+                
+                <!-- Bitácora Gerontológica Digital -->
+                <div>
+                    <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                        <i class="ph-fill ph-sparkle text-medical-light"></i> Bitácora Gerontológica Digital
+                    </h3>
+                    <div class="relative p-5 rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                        <!-- Imagen de fondo gerontológica -->
+                        <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1586892477838-2b96e85e0f96?q=80&w=600&auto=format&fit=crop')] bg-cover bg-center"></div>
+                        <!-- Overlay translúcido -->
+                        <div class="absolute inset-0 bg-white/90 backdrop-blur-sm"></div>
+                        
+                        <!-- Contenido -->
+                        <div class="relative z-10">
+                            <!-- SI existen informes -->
+                            <div x-show="currentInforme">
+                                <p class="text-sm text-slate-800 leading-relaxed font-medium" x-text="currentInforme?.contenido"></p>
+                            </div>
+                            
+                            <!-- SI NO existen informes -->
+                            <div x-show="!currentInforme" class="text-center py-3">
+                                <div class="w-12 h-12 bg-medical-light/10 text-medical-blue rounded-full flex items-center justify-center mx-auto mb-3 border border-medical-light/20">
+                                    <i class="ph-fill ph-hourglass-medium text-2xl animate-pulse"></i>
+                                </div>
+                                <p class="font-bold text-slate-800 text-sm mb-2">Bitácora en proceso de actualización</p>
+                                <p class="text-xs text-slate-600 leading-relaxed">
+                                    Bienvenido a su centro de seguimiento familiar. Los signos vitales, alimentación y estado general están siendo registrados por nuestra cuidadora profesional. En breves instantes visualizará aquí la evolución y bienestar de su ser querido, garantizando total transparencia y tranquilidad.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Medicación -->
+                <div>
+                    <h3 class="text-sm font-bold text-slate-800 mb-3">Medicación de hoy</h3>
+                    <div class="space-y-3">
+                        <template x-for="med in currentMedication" :key="med.id">
+                            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center" :class="!med.administrado ? 'opacity-60' : ''">
+                                <div class="flex items-center gap-4">
+                                    <div :class="med.administrado ? 'bg-medical-light/10 text-medical-blue' : 'bg-slate-100 text-slate-500'" class="p-2.5 rounded-xl">
+                                        <i class="ph-fill ph-pill text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-sm text-slate-800" x-text="med.medicamento"></p>
+                                        <p class="text-xs text-slate-500" x-text="med.hora + ' - ' + med.dosis"></p>
+                                    </div>
+                                </div>
+                                <i x-show="med.administrado" class="ph-fill ph-check-circle text-sage-dark text-2xl"></i>
+                                <i x-show="!med.administrado" class="ph ph-clock text-slate-400 text-2xl"></i>
+                            </div>
+                        </template>
+                        <div x-show="!currentMedication || currentMedication.length === 0" class="text-sm text-slate-500 text-center py-2">No hay medicación registrada.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Nav App -->
+            <div class="absolute bottom-0 w-full bg-white border-t border-slate-100 p-4 flex justify-around items-center text-slate-400 pb-8 rounded-b-[2.5rem]">
+                <div class="flex flex-col items-center text-medical-blue cursor-pointer">
+                    <i class="ph-fill ph-house text-2xl"></i>
+                    <span class="text-[10px] font-semibold mt-1">Inicio</span>
+                </div>
+                <div @click="openWhatsApp('Hola, deseo agendar un nuevo turno.')" class="flex flex-col items-center hover:text-medical-blue transition cursor-pointer">
+                    <i class="ph ph-calendar-blank text-2xl"></i>
+                    <span class="text-[10px] font-medium mt-1">Agenda</span>
+                </div>
+                <div @click="payService(currentPatientId)" class="flex flex-col items-center hover:text-medical-blue transition cursor-pointer">
+                    <i class="ph ph-credit-card text-2xl"></i>
+                    <span class="text-[10px] font-medium mt-1">Pagos</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         VISTA 4: APP CUIDADORA (Mobile First)
+         ========================================== -->
+    <div x-show="view === 'caregiver'" x-transition.opacity.duration.500ms class="min-h-screen bg-slate-200 flex justify-center items-center p-4" x-cloak>
+        <!-- Simulador de Teléfono -->
+        <div class="w-full max-w-[400px] bg-slate-50 rounded-[3rem] shadow-2xl overflow-hidden border-[8px] border-slate-900 relative h-[800px] flex flex-col">
+            
+            <!-- Header App -->
+            <div class="bg-medical-blue text-white p-6 pt-12 rounded-b-[2.5rem] shadow-md relative z-10">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <p class="text-medical-light/80 text-sm font-medium">Turno Actual</p>
+                        <h1 class="text-2xl font-bold mt-1" x-text="currentPatient?.nombre || 'Paciente'"></h1>
+                    </div>
+                    <button @click="logout" class="w-10 h-10 rounded-full bg-red-500/20 text-red-100 flex items-center justify-center backdrop-blur-sm hover:bg-red-500/40 transition" title="Cerrar Sesión">
+                        <i class="ph ph-sign-out text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Selector de Pacientes (Si hay múltiples) -->
+                <select x-show="pacientes.length > 1" x-model="currentPatientId" @change="loadPatientContext(currentPatientId)" class="mt-2 bg-white/20 text-white text-sm rounded-xl px-3 py-2 outline-none w-full appearance-none border border-white/10">
+                    <template x-for="p in pacientes" :key="p.id">
+                        <option :value="p.id" x-text="p.nombre" class="text-slate-900"></option>
+                    </template>
+                </select>
+
+                <div class="flex items-center gap-2 mt-4 text-sm bg-white/10 w-max px-4 py-2 rounded-full backdrop-blur-sm">
+                    <i class="ph ph-clock"></i> <span x-text="(currentVisit?.hora_inicio || '08:00') + ' - ' + (currentVisit?.hora_fin || '16:00')"></span>
+                </div>
+            </div>
+
+            <!-- Body App -->
+            <div class="flex-1 p-6 overflow-y-auto no-scrollbar space-y-6 pb-24">
+                
+                <!-- Acciones Rápidas -->
+                <div class="grid grid-cols-2 gap-4">
+                    <button class="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-2 text-medical-blue font-semibold hover:bg-slate-50 transition">
+                        <i class="ph-fill ph-check-circle text-3xl"></i> Check-In
+                    </button>
+                    <button @click="openWhatsApp('¡EMERGENCIA! Necesito asistencia inmediata en el domicilio de ' + (currentPatient?.nombre || 'mi paciente') + '.')" class="bg-red-50 p-4 rounded-3xl shadow-sm border border-red-100 flex flex-col items-center justify-center gap-2 text-red-600 font-semibold hover:bg-red-100 transition">
+                        <i class="ph-fill ph-warning-circle text-3xl"></i> Emergencia
+                    </button>
+                </div>
+
+                <!-- Botón GPS Inyectado -->
+                <button @click="toggleGps(currentPatientId)" :class="gpsActive ? 'bg-sage-light text-sage-dark border-sage-dark' : 'bg-white text-slate-700 border-slate-100 hover:bg-slate-50'" class="w-full p-4 rounded-3xl shadow-sm border flex items-center justify-center gap-3 font-semibold transition">
+                    <i class="ph-fill ph-map-pin text-2xl" :class="gpsActive ? 'animate-pulse' : ''"></i> 
+                    <span x-text="gpsActive ? 'GPS Transmitiendo al CRM' : 'Activar GPS (Monitoreo)'"></span>
+                </button>
+
+                <!-- Medicación -->
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-slate-900 mb-4">Medicación a dar</h3>
+                    <template x-for="med in currentMedication" :key="med.id">
+                        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-2xl mb-2">
+                            <div>
+                                <p class="font-bold text-slate-800 text-sm" x-text="med.medicamento"></p>
+                                <p class="text-xs text-slate-500" x-text="med.hora + ' - ' + med.dosis"></p>
+                            </div>
+                            <input type="checkbox" :checked="med.administrado" @change="toggleMedication(med.id, $event.target.checked)" class="w-6 h-6 rounded-full text-sage-dark focus:ring-sage-dark border-slate-300" />
+                        </div>
+                    </template>
+                    <div x-show="!currentMedication || currentMedication.length === 0" class="text-sm text-slate-500 text-center py-2">No hay medicación asignada.</div>
+                </div>
+
+                <!-- Reporte Rápido IA -->
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-slate-900 mb-1">Registro de Evolución del Paciente</h3>
+                    <p class="text-xs text-slate-500 mb-4">Detalla el estado general, alimentación, signos vitales y observaciones del turno.</p>
+                    
+                    <textarea 
+                        x-model="reporteIA"
+                        class="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-medical-light resize-none"
+                        rows="4"
+                        placeholder="Ej: Ingesta de alimentos completa, hidratación adecuada. Presión 120/80. Descansó 2 horas por la tarde. Estado de ánimo positivo y colaborador en ejercicios de movilidad."
+                    ></textarea>
+                    
+                    <button 
+                        @click="saveInforme()"
+                        class="w-full bg-medical-blue text-white py-3.5 rounded-2xl mt-4 font-semibold shadow-soft hover:bg-blue-900 transition flex justify-center items-center gap-2"
+                        :class="aiDone ? 'bg-sage-dark hover:bg-sage-dark' : ''"
+                    >
+                        <span x-show="!aiGenerating && !aiDone"><i class="ph-fill ph-sparkle"></i> Procesar Registro de Evolución</span>
+                        <span x-show="aiGenerating" class="animate-pulse">Procesando y estructurando reporte...</span>
+                        <span x-show="aiDone"><i class="ph-fill ph-check-circle"></i> Registro Enviado al Familiar</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         VISTA 5: CUIDADORA PENDIENTE
+         ========================================== -->
+    <div x-show="view === 'caregiver_pending'" x-transition.opacity.duration.500ms class="min-h-screen bg-slate-200 flex justify-center items-center p-4" x-cloak>
+        <div class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md text-center">
+            <div class="w-20 h-20 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="ph-fill ph-hourglass-high text-4xl animate-pulse"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-900 mb-2">Solicitud en Revisión</h2>
+            <p class="text-slate-600 mb-8">Su solicitud está siendo revisada por el equipo de María Vitae. Le notificaremos una vez sea aprobada para comenzar a ofrecer sus servicios.</p>
+            <button @click="logout" class="w-full bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition">Cerrar Sesión</button>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         VISTA 6: CUIDADORA RECHAZADA / INACTIVA
+         ========================================== -->
+    <div x-show="view === 'caregiver_rejected'" x-transition.opacity.duration.500ms class="min-h-screen bg-slate-200 flex justify-center items-center p-4" x-cloak>
+        <div class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md text-center">
+            <div class="w-20 h-20 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="ph-fill ph-x-circle text-4xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-900 mb-2">Acceso Denegado</h2>
+            <p class="text-slate-600 mb-8">Su solicitud no ha sido aprobada o su cuenta ha sido desactivada. Por favor, contacte a soporte para más información.</p>
+            <button @click="logout" class="w-full bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition">Cerrar Sesión</button>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         LÓGICA PRINCIPAL (Alpine.js + Supabase)
+         ========================================== -->
+    <script>
+        function mariaVitaeApp() {
+            return {
+                // ==========================================
+                // 1. VARIABLES DE CONFIGURACIÓN CRÍTICAS
+                // ==========================================
+                SUPABASE_URL: 'https://hurtorxxcsucoqseddoo.supabase.co', 
+                SUPABASE_KEY: 'sb_publishable_FgtS58vL1DQh_EPMAZsAHg_bAXxScD5',
+                
+                DUEÑO_EMAIL: 'adminmariavitae@gmail.com',
+                WHATSAPP_NUM: '593963322115',
+                LINK_PAGO_DIRECTO: 'https://link.mercadopago.com.co/tu_link_de_pago',
+
+                // ==========================================
+                // 2. ESTADO DE LA APLICACIÓN
+                // ==========================================
+                view: 'landing',
+                aiGenerating: false,
+                aiDone: false,
+                
+                // Auth Global & Roles
+                isAuthenticated: false,
+                userRole: null,
+                userEmail: null,
+                userId: null,
+                userName: null,
+                caregiverStatus: null,
+                showLoginModal: false,
+                showRegisterModal: false,
+                
+                loginEmail: '',
+                loginPassword: '',
+                loginLoading: false,
+                loginError: '',
+
+                registerData: { nombre: '', email: '', password: '', confirmPassword: '', role: 'family' },
+                registerLoading: false,
+                registerError: '',
+                
+                // Base de Datos (Sin mocks)
+                supabase: null,
+                pacientes: [],
+                visitas: [],
+                informes: [],
+                pagos: [],
+                cuidadores: [],
+                usuarios: [], // Nuevo estado para Administración de Usuarios
+                
+                // Contexto de Vistas Móviles
+                currentPatientId: null,
+                currentPatient: null,
+                currentVisit: null,
+                currentInforme: null,
+                currentMedication: [],
+                reporteIA: '',
+                lastGpsUpdate: 0,
+                realtimeChannel: null,
+
+                // Modal Nuevo Paciente
+                showNewPatientModal: false,
+                savingPatient: false,
+                newPatient: { nombre: '', cuidadora: '', servicio: '', familiar_email: '', cuidadora_email: '' },
+
+                // Modal Lead (Landing)
+                showLeadModal: false,
+                savingLead: false,
+                newLead: { nombre: '', telefono: '', servicio: '' },
+
+                // Navegación CRM Admin
+                adminTab: 'pacientes',
+                searchUsuario: '',
+                filterUsuario: 'todos',
+                
+                // Geolocalización
+                gpsWatchId: null,
+                gpsActive: false,
+
+                // ==========================================
+                // 3. MÉTODOS Y FUNCIONES
+                // ==========================================
+                async init() {
+                    try {
+                        if (!this.SUPABASE_URL || this.SUPABASE_URL === 'TU_SUPABASE_URL_REAL') {
+                            console.warn("Supabase no configurado. La app requiere credenciales reales para funcionar.");
+                            return;
+                        }
+                        
+                        this.supabase = window.supabase.createClient(this.SUPABASE_URL, this.SUPABASE_KEY);
+                        
+                        // Escuchar cambios de autenticación para evitar desincronización
+                        this.supabase.auth.onAuthStateChange((event, session) => {
+                            if (event === 'SIGNED_OUT') {
+                                this.clearLocalState();
+                            }
+                        });
+
+                        await this.checkSession();
+                        
+                    } catch (err) {
+                        console.error("Error inicializando la app:", err.message);
+                    }
+
+                    this.$watch('view', (val) => {
+                        if (val === 'admin' && this.isAuthenticated && this.userRole === 'admin') {
+                            this.loadInitialData();
+                        }
+                        if (val !== 'caregiver' && this.gpsActive) {
+                            this.stopGps();
+                        }
+                    });
+                },
+
+                async checkSession() {
+                    if (!this.supabase) return;
+                    const { data: { session }, error } = await this.supabase.auth.getSession();
+                    if (session) {
+                        await this.processLogin(session.user);
+                    }
+                },
+
+                async processLogin(user) {
+                    this.isAuthenticated = true;
+                    this.userEmail = user.email;
+                    this.userId = user.id;
+                    this.userName = user.user_metadata?.nombre || 'Usuario';
+                    
+                    // Preservar compatibilidad con el administrador original
+                    if (this.userEmail === this.DUEÑO_EMAIL) {
+                        this.userRole = 'admin';
+                        this.view = 'admin';
+                    } else {
+                        this.userRole = user.user_metadata?.role || 'family';
+                    }
+                    
+                    await this.checkAndCreateProfile(user);
+                    
+                    // Enrutamiento basado en rol y estado
+                    if (this.userRole === 'caregiver') {
+                        if (this.caregiverStatus === 'pendiente') {
+                            this.view = 'caregiver_pending';
+                        } else if (this.caregiverStatus === 'rechazado' || this.caregiverStatus === 'inactivo') {
+                            this.view = 'caregiver_rejected';
+                        } else {
+                            this.view = 'caregiver';
+                        }
+                    } else if (this.userRole === 'family') {
+                        this.view = 'family';
+                    }
+
+                    await this.loadInitialData();
+                    await this.subscribeRealtime();
+                },
+
+                async checkAndCreateProfile(user) {
+                    if (!this.supabase) return;
+                    try {
+                        const rol = user.email === this.DUEÑO_EMAIL ? 'admin' : (user.user_metadata?.role || 'family');
+                        const nombre = user.user_metadata?.nombre || (user.email === this.DUEÑO_EMAIL ? 'Administrador' : 'Usuario');
+
+                        if (rol === 'family') {
+                            // Intentar obtener el paciente para persistencia real
+                            const { data, error } = await this.supabase.from('pacientes').select('id').eq('id', user.id).single();
+                            
+                            // Si no existe (error PGRST116 es "no rows returned"), lo creamos
+                            if (error && error.code === 'PGRST116') {
+                                const { error: insertError } = await this.supabase.from('pacientes').insert([{
+                                    id: user.id,
+                                    nombre: nombre,
+                                    estado: 'Activo'
+                                }]);
+                                if (insertError) {
+                                    console.error("Error crítico insertando paciente:", insertError);
+                                }
+                            } else if (error) {
+                                console.error("Error consultando paciente:", error);
+                            }
+                        } else if (rol === 'caregiver') {
+                            const { data: cData, error: cError } = await this.supabase.from('cuidadores').select('id, estado').eq('id', user.id).single();
+                            if (cData) {
+                                this.caregiverStatus = cData.estado;
+                            } else {
+                                // Intentar insertar si no existe
+                                const { error: insertError } = await this.supabase.from('cuidadores').insert([{
+                                    id: user.id,
+                                    email: user.email,
+                                    nombre: nombre,
+                                    estado: 'pendiente'
+                                }]);
+                                if (insertError) {
+                                    console.error("Error crítico insertando cuidadora:", insertError);
+                                }
+                                this.caregiverStatus = 'pendiente'; // Por defecto pendiente
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Error general en checkAndCreateProfile:", err.message);
+                    }
+                },
+
+                async subscribeRealtime() {
+                    if (!this.supabase) return;
+                    try {
+                        if (this.realtimeChannel) {
+                            await this.supabase.removeChannel(this.realtimeChannel);
+                        }
+                        this.realtimeChannel = this.supabase.channel('custom-all-channel')
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'pacientes' }, payload => this.handleRealtimeChange())
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'medicacion' }, payload => this.handleRealtimeChange())
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'informes' }, payload => this.handleRealtimeChange())
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'visitas' }, payload => this.handleRealtimeChange())
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'ubicaciones' }, payload => this.handleRealtimeChange())
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'pagos' }, payload => this.handleRealtimeChange())
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'cuidadores' }, payload => this.handleRealtimeChange())
+                            .subscribe();
+                    } catch (err) {
+                        console.error("Error suscribiendo a realtime:", err.message);
+                    }
+                },
+
+                async handleRealtimeChange() {
+                    if (this.adminTab === 'pacientes' || this.userRole !== 'admin') {
+                        if (this.fetchPacientes) await this.fetchPacientes();
+                        if (this.fetchInformes) await this.fetchInformes();
+                        if (this.fetchPagos) await this.fetchPagos();
+                        if (this.fetchVisitas) await this.fetchVisitas();
+                    } else if (this.adminTab === 'agenda' && this.fetchVisitas) {
+                        await this.fetchVisitas();
+                    } else if (this.adminTab === 'pagos' && this.fetchPagos) {
+                        await this.fetchPagos();
+                    } else if (this.adminTab === 'cuidadores' && this.fetchCuidadores) {
+                        await this.fetchCuidadores();
+                    } else if (this.adminTab === 'usuarios' && this.fetchUsuarios) {
+                        await this.fetchUsuarios();
+                    }
+
+                    if (this.currentPatientId) {
+                        await this.loadPatientContext(this.currentPatientId);
+                    }
+                },
+
+                async loadInitialData() {
+                    try {
+                        // CORRECCIÓN CRÍTICA: Esperar a que fetchPacientes termine PRIMERO
+                        // para que las demás consultas puedan filtrar por los IDs de los pacientes.
+                        await this.fetchPacientes();
+                        
+                        const promises = [
+                            this.fetchVisitas(),
+                            this.fetchInformes(),
+                            this.fetchPagos()
+                        ];
+
+                        if (this.userRole === 'admin') {
+                            promises.push(this.fetchCuidadores());
+                            promises.push(this.fetchUsuarios());
+                        }
+                        
+                        await Promise.all(promises);
+                        
+                        if (this.pacientes.length > 0 && !this.currentPatientId) {
+                            this.currentPatientId = this.pacientes[0].id;
+                            await this.loadPatientContext(this.currentPatientId);
+                        }
+                    } catch (err) {
+                        console.error("Error cargando datos iniciales:", err.message);
+                    }
+                },
+
+                async loadPatientContext(patientId) {
+                    if (!this.supabase || !patientId) return;
+                    try {
+                        // Cargar paciente
+                        const { data: pData, error: pError } = await this.supabase.from('pacientes').select('*').eq('id', patientId).single();
+                        if (!pError && pData) this.currentPatient = pData;
+
+                        // Cargar medicación
+                        const { data: mData, error: mError } = await this.supabase.from('medicacion').select('*').eq('paciente_id', patientId);
+                        if (!mError && mData) this.currentMedication = mData;
+
+                        // Cargar informes (el más reciente)
+                        const { data: rData, error: rError } = await this.supabase.from('informes').select('*').eq('paciente_id', patientId).order('created_at', { ascending: false }).limit(1);
+                        if (!rError && rData && rData.length > 0) {
+                            this.currentInforme = rData[0];
+                        } else {
+                            this.currentInforme = null;
+                        }
+
+                        // Cargar visitas
+                        let { data: vData, error: vError } = await this.supabase.from('visitas').select('*').eq('paciente_id', patientId).order('created_at', { ascending: false }).limit(1);
+                        if (vError || !vData || vData.length === 0) {
+                            const { data: vDataFallback, error: vErrorFallback } = await this.supabase.from('visitas').select('*').order('created_at', { ascending: false }).limit(1);
+                            if (!vErrorFallback && vDataFallback && vDataFallback.length > 0) {
+                                this.currentVisit = vDataFallback[0];
+                            } else {
+                                this.currentVisit = null;
+                            }
+                        } else {
+                            this.currentVisit = vData[0];
+                        }
+                    } catch (err) {
+                        console.error("Error cargando contexto del paciente:", err.message);
+                    }
+                },
+
+                openWhatsApp(mensaje) {
+                    const url = `https://wa.me/${this.WHATSAPP_NUM}?text=${encodeURIComponent(mensaje)}`;
+                    window.open(url, '_blank');
+                },
+
+                async registerUser() {
+                    if (this.registerLoading) return; // Prevenir doble clic
+                    this.registerLoading = true;
+                    this.registerError = '';
+                    try {
+                        if (!this.supabase) throw new Error('Base de datos no configurada.');
+                        if (this.registerData.password !== this.registerData.confirmPassword) {
+                            throw new Error('Las contraseñas no coinciden.');
+                        }
+                        
+                        const { data, error } = await this.supabase.auth.signUp({
+                            email: this.registerData.email,
+                            password: this.registerData.password,
+                            options: {
+                                data: {
+                                    nombre: this.registerData.nombre,
+                                    role: this.registerData.role
+                                }
+                            }
+                        });
+                        
+                        if (error) {
+                            if (error.status === 429) throw new Error('Demasiados intentos. Por favor, espera unos minutos.');
+                            throw error;
+                        }
+                        
+                        alert('Registro exitoso. Iniciando sesión automáticamente...');
+                        this.showRegisterModal = false;
+                        
+                        // Auto login
+                        this.loginEmail = this.registerData.email;
+                        this.loginPassword = this.registerData.password;
+                        await this.login();
+                        
+                    } catch (err) {
+                        console.error("Error en registerUser:", err);
+                        this.registerError = err.message;
+                    } finally {
+                        this.registerLoading = false;
+                    }
+                },
+
+                async login() {
+                    if (this.loginLoading) return; // Prevenir doble clic
+                    this.loginLoading = true;
+                    this.loginError = '';
+                    
+                    try {
+                        if (!this.supabase) {
+                            throw new Error('El sistema de base de datos no está configurado.');
+                        }
+
+                        const { data, error } = await this.supabase.auth.signInWithPassword({
+                            email: this.loginEmail,
+                            password: this.loginPassword
+                        });
+                        
+                        if (error) {
+                            if (error.status === 429) throw new Error('Demasiados intentos. Por favor, espera unos minutos.');
+                            throw error;
+                        }
+
+                        this.showLoginModal = false;
+                        await this.processLogin(data.user);
+                        
+                    } catch (err) {
+                        this.loginError = err.message || 'Credenciales incorrectas o error de conexión.';
+                    } finally {
+                        this.loginLoading = false;
+                    }
+                },
+
+                clearLocalState() {
+                    this.isAuthenticated = false;
+                    this.userRole = null;
+                    this.userEmail = null;
+                    this.userId = null;
+                    this.userName = null;
+                    this.caregiverStatus = null;
+                    this.loginEmail = '';
+                    this.loginPassword = '';
+                    this.pacientes = [];
+                    this.visitas = [];
+                    this.informes = [];
+                    this.pagos = [];
+                    this.cuidadores = [];
+                    this.usuarios = [];
+                    this.currentPatientId = null;
+                    this.currentPatient = null;
+                    this.currentVisit = null;
+                    this.currentInforme = null;
+                    this.currentMedication = [];
+                    this.reporteIA = '';
+                    this.adminTab = 'pacientes';
+                    this.searchUsuario = '';
+                    this.filterUsuario = 'todos';
+                    this.stopGps();
+                    this.view = 'landing';
+                },
+
+                async logout() {
+                    try {
+                        if (this.realtimeChannel) {
+                            await this.supabase.removeChannel(this.realtimeChannel);
+                        }
+                        if (this.supabase) {
+                            await this.supabase.auth.signOut();
+                        }
+                    } catch (err) {
+                        console.error("Error al cerrar sesión:", err.message);
+                    } finally {
+                        this.clearLocalState();
+                    }
+                },
+
+                // --- REGISTRO DE LEADS (LANDING) ---
+                async registerLead() {
+                    if (!this.supabase) return;
+                    if (!this.newLead.nombre || !this.newLead.telefono || !this.newLead.servicio) {
+                        alert("Por favor completa todos los campos.");
+                        return;
+                    }
+                    this.savingLead = true;
+                    try {
+                        const { error } = await this.supabase.from('pacientes').insert([{
+                            nombre: this.newLead.nombre,
+                            servicio: this.newLead.servicio,
+                            estado: 'Prospecto'
+                        }]);
+                        
+                        if (error) throw error;
+
+                        const msg = `Hola, soy ${this.newLead.nombre}. Deseo agendar una evaluación para el servicio de ${this.newLead.servicio}. Mi teléfono es ${this.newLead.telefono}.`;
+                        this.openWhatsApp(msg);
+
+                        this.showLeadModal = false;
+                        this.newLead = { nombre: '', telefono: '', servicio: '' };
+                    } catch (err) {
+                        console.error("Error registrando lead:", err.message);
+                        alert("Hubo un error al enviar la solicitud.");
+                    } finally {
+                        this.savingLead = false;
+                    }
+                },
+
+                // --- CRUD PACIENTES (Con filtrado por Rol) ---
+                async fetchPacientes() {
+                    if (!this.supabase) return;
+                    try {
+                        let query = this.supabase.from('pacientes').select('*').order('created_at', { ascending: false });
+                        
+                        // Filtrado RLS Frontend usando columnas reales
+                        if (this.userRole === 'family') {
+                            query = query.eq('id', this.userId);
+                        } else if (this.userRole === 'caregiver') {
+                            query = query.eq('cuidadora', this.userName);
+                        }
+                            
+                        const { data, error } = await query;
+                        if (error) {
+                            console.error("Error crítico en fetchPacientes:", error);
+                            throw error;
+                        }
+                        if (data) {
+                            this.pacientes = data;
+                            if ((this.userRole === 'family' || this.userRole === 'caregiver' || this.userRole === 'admin') && this.pacientes.length > 0 && !this.currentPatientId) {
+                                this.currentPatientId = this.pacientes[0].id;
+                                await this.loadPatientContext(this.currentPatientId);
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Error obteniendo pacientes:", err.message);
+                    }
+                },
+
+                async addPaciente() {
+                    this.savingPatient = true;
+                    try {
+                        if (!this.supabase) throw new Error("Supabase no conectado.");
+                        
+                        const { data, error } = await this.supabase.from('pacientes').insert([{
+                            nombre: this.newPatient.nombre,
+                            cuidadora: this.newPatient.cuidadora,
+                            servicio: this.newPatient.servicio,
+                            estado: 'En Curso'
+                        }]).select();
+                        
+                        if (error) {
+                            console.error("Error crítico insertando paciente:", error);
+                            throw error;
+                        }
+                        if (data) {
+                            this.pacientes.unshift(data[0]);
+                            if (!this.currentPatientId) {
+                                this.currentPatientId = data[0].id;
+                                await this.loadPatientContext(this.currentPatientId);
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Error guardando paciente:", err.message);
+                        alert("Hubo un error al guardar el paciente: " + err.message);
+                    } finally {
+                        this.showNewPatientModal = false;
+                        this.newPatient = { nombre: '', cuidadora: '', servicio: '', familiar_email: '', cuidadora_email: '' };
+                        this.savingPatient = false;
+                    }
+                },
+
+                async updatePaciente(id, updateData) {
+                    try {
+                        if (!this.supabase) throw new Error("Supabase no conectado.");
+                        const { data, error } = await this.supabase
+                            .from('pacientes')
+                            .update(updateData)
+                            .eq('id', id)
+                            .select();
+                            
+                        if (error) throw error;
+                        await this.fetchPacientes();
+                    } catch (err) {
+                        console.error("Error actualizando paciente:", err.message);
+                    }
+                },
+
+                async deletePaciente(id) {
+                    try {
+                        if (!this.supabase) throw new Error("Supabase no conectado.");
+                        const { error } = await this.supabase
+                            .from('pacientes')
+                            .delete()
+                            .eq('id', id);
+                            
+                        if (error) throw error;
+                        this.pacientes = this.pacientes.filter(p => p.id !== id);
+                    } catch (err) {
+                        console.error("Error eliminando paciente:", err.message);
+                    }
+                },
+
+                // --- LECTURA DE OTRAS TABLAS (Con filtrado por Rol) ---
+                async fetchVisitas() {
+                    if (!this.supabase) return;
+                    try {
+                        let query = this.supabase.from('visitas').select('*').order('created_at', { ascending: false });
+                        
+                        if (this.userRole !== 'admin' && this.pacientes.length > 0) {
+                            const patientIds = this.pacientes.map(p => p.id);
+                            query = query.in('paciente_id', patientIds);
+                        } else if (this.userRole !== 'admin' && this.pacientes.length === 0) {
+                            this.visitas = [];
+                            return;
+                        }
+
+                        const { data, error } = await query;
+                        if (error) throw error;
+                        if (data) this.visitas = data;
+                    } catch (err) {
+                        console.error("Error obteniendo visitas:", err.message);
+                    }
+                },
+
+                async fetchInformes() {
+                    if (!this.supabase) return;
+                    try {
+                        let query = this.supabase.from('informes').select('*');
+                        
+                        if (this.userRole !== 'admin' && this.pacientes.length > 0) {
+                            const patientIds = this.pacientes.map(p => p.id);
+                            query = query.in('paciente_id', patientIds);
+                        } else if (this.userRole !== 'admin' && this.pacientes.length === 0) {
+                            this.informes = [];
+                            return;
+                        }
+
+                        const { data, error } = await query;
+                        if (error) throw error;
+                        if (data) this.informes = data;
+                    } catch (err) {
+                        console.error("Error obteniendo informes:", err.message);
+                    }
+                },
+
+                async fetchPagos() {
+                    if (!this.supabase) return;
+                    try {
+                        let query = this.supabase.from('pagos').select('*').order('id', { ascending: false });
+                        
+                        if (this.userRole !== 'admin' && this.pacientes.length > 0) {
+                            const patientIds = this.pacientes.map(p => p.id);
+                            query = query.in('paciente_id', patientIds);
+                        } else if (this.userRole !== 'admin' && this.pacientes.length === 0) {
+                            this.pagos = [];
+                            return;
+                        }
+
+                        const { data, error } = await query;
+                        if (error) throw error;
+                        if (data) this.pagos = data;
+                    } catch (err) {
+                        console.error("Error obteniendo pagos:", err.message);
+                    }
+                },
+
+                // --- GESTIÓN DE CUIDADORAS (ADMIN) ---
+                async fetchCuidadores() {
+                    if (!this.supabase) return;
+                    try {
+                        const { data, error } = await this.supabase.from('cuidadores').select('*').order('created_at', { ascending: false });
+                        if (error) throw error;
+                        if (data) this.cuidadores = data;
+                    } catch (err) {
+                        console.error("Error obteniendo cuidadoras:", err.message);
+                    }
+                },
+
+                async updateCuidadoraStatus(id, status) {
+                    if (!this.supabase) return;
+                    try {
+                        const { error } = await this.supabase.from('cuidadores').update({ estado: status }).eq('id', id);
+                        if (error) throw error;
+                        await this.fetchCuidadores();
+                        if (this.adminTab === 'usuarios') await this.fetchUsuarios();
+                    } catch (err) {
+                        console.error("Error actualizando estado de cuidadora:", err.message);
+                    }
+                },
+
+                deleteUserAlert() {
+                    alert("Para eliminar permanentemente un usuario de Supabase Auth por razones de seguridad, se requiere ejecutar esta acción desde el backend (Edge Functions) usando la Service Role Key. Actualmente, el sistema permite 'Desactivar' a la cuidadora para revocar su acceso.");
+                },
+
+                // --- ADMINISTRACIÓN DE USUARIOS (CORREGIDO) ---
+                async fetchUsuarios() {
+                    if (!this.supabase) return;
+                    try {
+                        // Asegurar que tenemos los datos más recientes de las fuentes reales
+                        await this.fetchPacientes();
+                        await this.fetchCuidadores();
+
+                        let merged = [];
+                        
+                        // 1. Cuidadoras (Fuente real: tabla cuidadores)
+                        if (this.cuidadores) {
+                            this.cuidadores.forEach(c => {
+                                merged.push({
+                                    id: c.id,
+                                    email: c.email,
+                                    nombre: c.nombre,
+                                    rol: 'caregiver',
+                                    estado: c.estado || 'pendiente',
+                                    created_at: c.created_at
+                                });
+                            });
+                        }
+
+                        // 2. Familiares (Fuente real: tabla pacientes)
+                        if (this.pacientes) {
+                            this.pacientes.forEach(p => {
+                                merged.push({
+                                    id: p.id,
+                                    email: 'Sin email',
+                                    nombre: p.nombre, // Nombre del paciente asociado
+                                    rol: 'family',
+                                    estado: p.estado || 'Activo',
+                                    created_at: p.created_at
+                                });
+                            });
+                        }
+                        
+                        this.usuarios = merged;
+                    } catch (err) {
+                        console.error("Error obteniendo usuarios:", err.message);
+                    }
+                },
+
+                get filteredUsuarios() {
+                    return this.usuarios.filter(u => {
+                        const matchesSearch = (u.nombre?.toLowerCase() || '').includes(this.searchUsuario.toLowerCase()) || 
+                                              (u.email?.toLowerCase() || '').includes(this.searchUsuario.toLowerCase());
+                        if (!matchesSearch) return false;
+
+                        if (this.filterUsuario === 'todos') return true;
+                        if (this.filterUsuario === 'familiares') return u.rol === 'family';
+                        if (this.filterUsuario === 'cuidadoras') return u.rol === 'caregiver';
+                        if (this.filterUsuario === 'pendientes') return u.rol === 'caregiver' && u.estado === 'pendiente';
+                        if (this.filterUsuario === 'aprobadas') return u.rol === 'caregiver' && u.estado === 'aprobado';
+                        if (this.filterUsuario === 'rechazadas') return u.rol === 'caregiver' && u.estado === 'rechazado';
+                        if (this.filterUsuario === 'inactivas') return (u.rol === 'caregiver' && u.estado === 'inactivo') || (u.rol === 'family' && u.estado === 'Inactivo');
+                        
+                        return true;
+                    });
+                },
+
+                verUsuario(usuario) {
+                    alert(`Detalles del Usuario:\n\nNombre: ${usuario.nombre}\nEmail: ${usuario.email}\nTipo: ${usuario.rol === 'family' ? 'Familiar / Paciente' : 'Cuidadora'}\nEstado: ${usuario.estado}\nFecha de Registro: ${this.formatDate(usuario.created_at)}`);
+                },
+
+                async desactivarUsuario(usuario) {
+                    if (usuario.rol === 'caregiver') {
+                        await this.updateCuidadoraStatus(usuario.id, 'inactivo');
+                    } else if (usuario.rol === 'family') {
+                        await this.updatePaciente(usuario.id, { estado: 'Inactivo' });
+                        await this.fetchUsuarios();
+                    }
+                },
+
+                async reactivarUsuario(usuario) {
+                    if (usuario.rol === 'caregiver') {
+                        await this.updateCuidadoraStatus(usuario.id, 'pendiente');
+                    } else if (usuario.rol === 'family') {
+                        await this.updatePaciente(usuario.id, { estado: 'En Curso' });
+                        await this.fetchUsuarios();
+                    }
+                },
+
+                async deleteUsuario(id, rol, email) {
+                    if (!confirm("Esta acción eliminará permanentemente el usuario de la base de datos y de Autenticación. El correo quedará completamente liberado. ¿Desea continuar?")) return;
+                    
+                    if (!this.supabase) return;
+                    try {
+                        let authUserId = id;
+
+                        // 1. Identificar el ID de Auth y limpiar tablas públicas
+                        if (rol === 'family') {
+                            authUserId = id;
+                            await this.supabase.from('pacientes').delete().eq('id', id);
+                        } else if (rol === 'caregiver') {
+                            await this.supabase.from('cuidadores').delete().eq('id', id);
+                        }
+
+                        if (authUserId) {
+                            // 3. Llamar a la Edge Function para eliminar de Supabase Auth
+                            const { data, error } = await this.supabase.functions.invoke('delete-user', {
+                                body: { userId: authUserId }
+                            });
+                            
+                            if (error) {
+                                console.error("Error en Edge Function:", error);
+                                alert("Aviso: Se eliminaron los datos locales, pero la eliminación en Auth falló. Asegúrese de haber desplegado la Edge Function 'delete-user'.");
+                            } else {
+                                alert("Usuario eliminado exitosamente. El correo ha sido liberado y puede volver a registrarse.");
+                            }
+                        } else {
+                            alert("Datos locales eliminados. No se encontró cuenta de Auth vinculada para liberar el correo.");
+                        }
+                        
+                        await this.fetchPacientes();
+                        await this.fetchCuidadores();
+                        await this.fetchUsuarios();
+                    } catch (err) {
+                        console.error("Error eliminando usuario:", err.message);
+                        alert("Hubo un error al eliminar el usuario: " + err.message);
+                    }
+                },
+
+                // --- OPERACIONES REALES (FASE 3) ---
+                async saveInforme() {
+                    if (!this.supabase || !this.currentPatientId || !this.reporteIA?.trim()) return;
+                    this.aiGenerating = true;
+                    try {
+                        const { error } = await this.supabase.from('informes').insert([{
+                            paciente_id: this.currentPatientId,
+                            contenido: this.reporteIA,
+                            created_at: new Date().toISOString()
+                        }]);
+                        if (error) throw error;
+                        
+                        this.reporteIA = '';
+                        this.aiDone = true;
+                        setTimeout(() => { this.aiDone = false; }, 3000);
+                        
+                        await this.loadPatientContext(this.currentPatientId);
+                        if (this.fetchInformes) await this.fetchInformes();
+                    } catch (err) {
+                        console.error("Error guardando informe:", err.message);
+                    } finally {
+                        this.aiGenerating = false;
+                    }
+                },
+
+                async toggleMedication(id, estado) {
+                    if (!this.supabase) return;
+                    try {
+                        const { error } = await this.supabase.from('medicacion').update({ administrado: estado }).eq('id', id);
+                        if (error) throw error;
+                        await this.loadPatientContext(this.currentPatientId);
+                    } catch (err) {
+                        console.error("Error actualizando medicación:", err.message);
+                    }
+                },
+
+                // --- ACTIVIDAD RECIENTE ---
+                getActividadReciente() {
+                    let actividades = [];
+                    
+                    (this.informes || []).forEach(inf => {
+                        actividades.push({
+                            id: inf.id,
+                            tipo: 'informe',
+                            titulo: 'Nueva Bitácora Gerontológica',
+                            descripcion: inf.contenido ? (inf.contenido.substring(0, 60) + '...') : 'Reporte guardado',
+                            fecha: inf.created_at || new Date().toISOString()
+                        });
+                    });
+
+                    (this.pagos || []).forEach(pago => {
+                        actividades.push({
+                            id: pago.id,
+                            tipo: 'pago',
+                            titulo: 'Pago Registrado',
+                            descripcion: `Monto: $${pago.monto} - Método: ${pago.metodo || 'N/A'}`,
+                            fecha: pago.created_at || new Date().toISOString()
+                        });
+                    });
+
+                    (this.visitas || []).forEach(visita => {
+                        actividades.push({
+                            id: visita.id,
+                            tipo: 'visita',
+                            titulo: `Visita: ${visita.estado || 'Registrada'}`,
+                            descripcion: `Fecha: ${visita.fecha || 'N/A'} | Horario: ${visita.hora_inicio || ''} - ${visita.hora_fin || ''}`,
+                            fecha: visita.created_at || new Date().toISOString()
+                        });
+                    });
+
+                    actividades.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+                    return actividades.slice(0, 10);
+                },
+
+                formatDate(dateString) {
+                    if (!dateString) return '';
+                    const d = new Date(dateString);
+                    return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute:'2-digit' });
+                },
+
+                // --- FUNCIONES OPERATIVAS ---
+                stopGps() {
+                    if (this.gpsWatchId !== null) {
+                        navigator.geolocation.clearWatch(this.gpsWatchId);
+                        this.gpsWatchId = null;
+                    }
+                    this.gpsActive = false;
+                },
+
+                toggleGps(pacienteId) {
+                    if (!this.supabase) {
+                        alert("Conecta Supabase primero para usar el GPS.");
+                        return;
+                    }
+                    if (!pacienteId) {
+                        alert("Error: No hay un paciente seleccionado.");
+                        return;
+                    }
+
+                    if (this.gpsActive) {
+                        this.stopGps();
+                    } else {
+                        if (navigator.geolocation) {
+                            this.gpsActive = true;
+                            this.gpsWatchId = navigator.geolocation.watchPosition(async (position) => {
+                                try {
+                                    if (Date.now() - this.lastGpsUpdate < 30000) {
+                                        return;
+                                    }
+
+                                    const lat = position.coords.latitude;
+                                    const lng = position.coords.longitude;
+                                    
+                                    const { error: err1 } = await this.supabase.from('pacientes').update({ lat, lng }).eq('id', pacienteId);
+                                    if (err1) throw err1;
+
+                                    const { error: err2 } = await this.supabase.from('ubicaciones').insert([{
+                                        paciente_id: pacienteId,
+                                        lat: lat,
+                                        lng: lng,
+                                        timestamp: new Date().toISOString()
+                                    }]);
+                                    if (err2) throw err2;
+
+                                    this.lastGpsUpdate = Date.now();
+                                    
+                                    if (this.view === 'admin' && this.adminTab === 'pacientes') this.fetchPacientes();
+                                } catch (err) {
+                                    console.error("Error actualizando GPS:", err.message);
+                                }
+                            }, (error) => {
+                                console.error("Error GPS:", error.message);
+                                this.stopGps();
+                                alert("Por favor, permite el acceso a la ubicación.");
+                            }, { enableHighAccuracy: true });
+                        } else {
+                            alert("Tu dispositivo no soporta geolocalización.");
+                        }
+                    }
+                },
+
+                payService(pacienteId) {
+                    if (!this.supabase) {
+                        alert("Conecta Supabase primero para procesar pagos.");
+                        return;
+                    }
+                    if (!pacienteId) {
+                        alert("Error: No hay un paciente seleccionado para el pago.");
+                        return;
+                    }
+
+                    window.open(this.LINK_PAGO_DIRECTO, '_blank');
+                    
+                    setTimeout(async () => {
+                        try {
+                            const { error } = await this.supabase.from('pacientes').update({ estado: 'Pagado/Activo' }).eq('id', pacienteId);
+                            if (error) throw error;
+                            
+                            if (this.view === 'admin' && this.adminTab === 'pacientes') this.fetchPacientes();
+                        } catch (err) {
+                            console.error("Error actualizando estado de pago:", err.message);
+                        }
+                    }, 5000);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
